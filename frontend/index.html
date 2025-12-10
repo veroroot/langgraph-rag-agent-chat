@@ -4,6 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>RAG Agent</title>
+    <!-- Runtime configuration injection -->
+    <script>
+      // 런타임에 환경변수를 window 객체에 주입
+      // nginx의 envsubst를 통해 런타임에 주입됨
+      window.__ENV__ = {
+        VITE_API_BASE_URL: '${VITE_API_BASE_URL}' || ''
+      };
+    </script>
   </head>
   <body>
     <div id="root"></div>

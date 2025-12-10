@@ -1,0 +1,98 @@
+name: Build and Deploy to Kubernetes
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+
+env:
+  REGISTRY: your-registry.com  # 실제 레지스트리로 변경
+  BACKEND_IMAGE: langchain-langgraph-agent-backend
+  FRONTEND_IMAGE: langchain-langgraph-agent-frontend
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx@v3
+
+    - name: Login to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ secrets.REGISTRY_USERNAME }}
+        password: ${{ secrets.REGISTRY_PASSWORD }}
+
+    - name: Build and push backend image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./backend/Dockerfile.prod
+        push: true
+        tags: |
+          ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest
+        cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:buildcache
+        cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:buildcache,mode=max
+
+    - name: Build and push frontend image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend
+        file: ./frontend/Dockerfile.prod
+        push: true
+        tags: |
+          ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:latest
+        cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:buildcache
+        cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:buildcache,mode=max
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+
+    - name: Configure kubectl
+      run: |
+        echo "${{ secrets.KUBECONFIG }}" | base64 -d > kubeconfig
+        export KUBECONFIG=./kubeconfig
+
+    - name: Update image in deployment files
+      run: |
+        sed -i "s|langchain-langgraph-agent-backend:latest|${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }}|g" infra/k8s/backend-deployment.yaml
+        sed -i "s|langchain-langgraph-agent-frontend:latest|${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}|g" infra/k8s/frontend-deployment.yaml
+
+    - name: Deploy to Kubernetes
+      run: |
+        export KUBECONFIG=./kubeconfig
+        kubectl apply -f infra/k8s/namespace.yaml
+        kubectl apply -f infra/k8s/configmap.yaml
+        kubectl apply -f infra/k8s/postgres-init-configmap.yaml
+        kubectl apply -f infra/k8s/secrets.yaml
+        kubectl apply -f infra/k8s/postgres-statefulset.yaml
+        kubectl apply -f infra/k8s/backend-deployment.yaml
+        kubectl apply -f infra/k8s/frontend-deployment.yaml
+        kubectl apply -f infra/k8s/ingress.yaml
+
+    - name: Wait for rollout
+      run: |
+        export KUBECONFIG=./kubeconfig
+        kubectl rollout status deployment/backend -n langchain-langgraph-agent
+        kubectl rollout status deployment/frontend -n langchain-langgraph-agent
+

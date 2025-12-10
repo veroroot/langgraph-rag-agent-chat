@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: langchain-langgraph-agent
+  labels:
+    name: langchain-langgraph-agent
+    environment: production
+

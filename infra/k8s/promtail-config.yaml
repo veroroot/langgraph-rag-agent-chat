@@ -1,0 +1,163 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: promtail-config
+  namespace: langchain-langgraph-agent
+data:
+  promtail.yaml: |
+    server:
+      http_listen_port: 3101
+      grpc_listen_port: 9095
+    
+    positions:
+      filename: /tmp/positions.yaml
+    
+    clients:
+      - url: http://loki:3100/loki/api/v1/push
+    
+    scrape_configs:
+      # Backend logs (pod log path)
+      - job_name: backend-pods
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - langchain-langgraph-agent
+        relabel_configs:
+          - action: keep
+            source_labels: [__meta_kubernetes_pod_label_app]
+            regex: backend
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            target_label: app
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - action: replace
+            source_labels:
+              - __meta_kubernetes_namespace
+              - __meta_kubernetes_pod_name
+              - __meta_kubernetes_pod_uid
+              - __meta_kubernetes_pod_container_name
+            target_label: __path__
+            replacement: /var/log/pods/${1}_${2}_${3}/${4}/*.log
+        pipeline_stages:
+          # container runtime JSON 해체 (log/stream/time 필드 -> 본문 추출)
+          - docker: {}
+          - json:
+              expressions:
+                timestamp: timestamp
+                level: level
+                message: message
+                request_id: request_id
+                method: method
+                path: path
+                status_code: status_code
+                duration: duration
+              drop_malformed: false
+          # 노이즈 로그(/metrics, /health) 제거
+          - match:
+              selector: '{path=~"/(metrics|health)"}'
+              action: drop
+          # path 필드가 비어 있을 때 대비한 내용 기반 드롭
+          - drop:
+              expression: '"/metrics"'
+          - drop:
+              expression: '"/health"'
+          - labels:
+              level:
+              app:
+              pod:
+              namespace:
+              status_code:
+              path:
+              method:
+          # 원본 JSON 라인 유지 (LogQL에서 | json 파서 사용을 위해)
+
+      # Backend logs (containerd symlink path)
+      - job_name: backend-containers
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - langchain-langgraph-agent
+        relabel_configs:
+          - action: keep
+            source_labels: [__meta_kubernetes_pod_label_app]
+            regex: backend
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            target_label: app
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - action: replace
+            source_labels:
+              - __meta_kubernetes_pod_container_name
+              - __meta_kubernetes_pod_name
+              - __meta_kubernetes_namespace
+              - __meta_kubernetes_pod_container_id
+            regex: ([^/]+);([^/]+);([^/]+);.*/(.+)
+            target_label: __path__
+            replacement: /var/log/containers/${2}_${3}_${1}-${4}.log
+        pipeline_stages:
+          # container runtime JSON 해체 (log/stream/time 필드 -> 본문 추출)
+          - docker: {}
+          - json:
+              expressions:
+                timestamp: timestamp
+                level: level
+                message: message
+                request_id: request_id
+                method: method
+                path: path
+                status_code: status_code
+                duration: duration
+              drop_malformed: false
+          # 노이즈 로그(/metrics, /health) 제거
+          - match:
+              selector: '{path=~"/(metrics|health)"}'
+              action: drop
+          # path 필드가 비어 있을 때 대비한 내용 기반 드롭
+          - drop:
+              expression: '"/metrics"'
+          - drop:
+              expression: '"/health"'
+          - labels:
+              level:
+              app:
+              pod:
+              namespace:
+              status_code:
+              path:
+              method:
+
+      # Frontend logs
+      - job_name: frontend
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - langchain-langgraph-agent
+        relabel_configs:
+          - source_labels:
+              - __meta_kubernetes_pod_label_app
+            target_label: app
+          - source_labels:
+              - __meta_kubernetes_pod_name
+            target_label: pod
+          - source_labels:
+              - __meta_kubernetes_namespace
+            target_label: namespace
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+        pipeline_stages:
+          - labels:
+              app:
+              pod:
+              namespace:
+

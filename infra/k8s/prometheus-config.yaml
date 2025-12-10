@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: langchain-langgraph-agent
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: 'langchain-langgraph-agent'
+        environment: 'local'
+    
+    scrape_configs:
+      # Backend metrics
+      - job_name: 'backend'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - langchain-langgraph-agent
+        relabel_configs:
+          # 먼저 backend 앱만 필터링
+          - action: keep
+            source_labels:
+              - __meta_kubernetes_pod_label_app
+            regex: backend
+          # 그 다음 레이블 설정
+          - source_labels:
+              - __meta_kubernetes_pod_label_app
+            target_label: app
+          - source_labels:
+              - __meta_kubernetes_pod_name
+            target_label: pod
+          - source_labels:
+              - __meta_kubernetes_pod_namespace
+            target_label: namespace
+          # 주소 설정 (Pod IP:8000)
+          - action: replace
+            regex: (.+)
+            source_labels:
+              - __meta_kubernetes_pod_ip
+            target_label: __address__
+            replacement: ${1}:8000
+          # 메트릭 경로 설정
+          - action: replace
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /metrics
+      
+      # Prometheus itself
+      - job_name: 'prometheus'
+        static_configs:
+          - targets:
+              - localhost:9090
+

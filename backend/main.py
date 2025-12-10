@@ -2,12 +2,14 @@
 import warnings
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
 from fastapi.middleware.cors import CORSMiddleware
 from backend.core.config import settings
 from backend.core.db import init_db, get_session
 from backend.core.limiter import setup_rate_limiter
 from backend.core.middleware import RequestIDMiddleware, LoggingMiddleware
 from backend.core.logging import logger
+from backend.core.metrics import setup_metrics
 from backend.api.v1.routers import api_router
 
 # Suppress Pydantic V1 compatibility warning for Python 3.14+
@@ -31,6 +33,19 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down application...")
 
 
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title=settings.APP_NAME,
+        version=settings.APP_VERSION,
+        description="LangChain LangGraph Agent API",
+        routes=app.routes,
+    )
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
 # Create FastAPI app
 app = FastAPI(
     title=settings.APP_NAME,
@@ -38,6 +53,8 @@ app = FastAPI(
     debug=settings.DEBUG,
     lifespan=lifespan,
 )
+
+app.openapi_schema = custom_openapi()
 
 # Setup CORS
 app.add_middleware(
@@ -54,6 +71,9 @@ app.add_middleware(LoggingMiddleware)
 
 # Setup rate limiting
 setup_rate_limiter(app)
+
+# Setup Prometheus metrics
+setup_metrics(app)
 
 # Include routers
 app.include_router(api_router)

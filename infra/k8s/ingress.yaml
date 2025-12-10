@@ -1,0 +1,84 @@
+# Nginx Ingress Controller 사용 예제
+# 다른 Ingress Controller (Traefik, Istio 등)를 사용하는 경우 수정 필요
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: langchain-langgraph-agent-ingress
+  namespace: langchain-langgraph-agent
+  annotations:
+    # Nginx Ingress Controller annotations
+    # rewrite-target 제거: 백엔드가 /api/v1 경로를 직접 처리하므로 경로를 그대로 전달
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # 파일 업로드 크기 제한 설정 (백엔드 MAX_UPLOAD_SIZE와 일치: 1000MB)
+    nginx.ingress.kubernetes.io/proxy-body-size: "1000m"
+    # SSL 인증서 사용 시 아래 주석 해제
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx  # 클러스터의 IngressClass에 맞게 변경
+  rules:
+  - host: langchain-agent.local  # 실제 도메인으로 변경
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: backend-service
+            port:
+              number: 8000
+      - path: /docs
+        pathType: Prefix
+        backend:
+          service:
+            name: backend-service
+            port:
+              number: 8000
+      - path: /health
+        pathType: Exact
+        backend:
+          service:
+            name: backend-service
+            port:
+              number: 8000
+      - path: /metrics
+        pathType: Exact
+        backend:
+          service:
+            name: backend-service
+            port:
+              number: 8000
+  - host: grafana.langchain-agent.local
+    http:
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: grafana
+              port:
+                number: 3000
+  - host: prometheus.langchain-agent.local
+    http:
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: prometheus
+              port:
+                number: 9090
+  # TLS 설정 (SSL 인증서 사용 시)
+  # tls:
+  # - hosts:
+  #   - langchain-agent.local
+  #   secretName: langchain-agent-tls
+

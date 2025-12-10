@@ -1,0 +1,247 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: langchain-langgraph-agent
+  labels:
+    app: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - name: backend
+        # image: langchain-langgraph-agent-backend:latest  # 실제 이미지 경로로 변경
+        image: localhost:5500/langchain-langgraph-agent-backend:latest  # 실제 이미지 경로로 변경
+        imagePullPolicy: IfNotPresent  # 또는 Always (프라이빗 레지스트리 사용 시)
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: APP_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: APP_NAME
+        - name: APP_VERSION
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: APP_VERSION
+        - name: DEBUG
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: DEBUG
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: DATABASE_URL
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: SECRET_KEY
+        - name: VECTOR_STORE_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: VECTOR_STORE_TYPE
+        - name: VECTOR_DIMENSION
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: VECTOR_DIMENSION
+        - name: VECTOR_COLLECTION_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: VECTOR_COLLECTION_NAME
+        - name: EMBEDDING_MODEL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: EMBEDDING_MODEL
+        - name: EMBEDDING_PROVIDER
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: EMBEDDING_PROVIDER
+        - name: LLM_MODEL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: LLM_MODEL
+        - name: LLM_TEMPERATURE
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: LLM_TEMPERATURE
+        - name: LLM_PROVIDER
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: LLM_PROVIDER
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: OPENAI_API_KEY
+        - name: STORAGE_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: STORAGE_TYPE
+        - name: UPLOAD_DIR
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: UPLOAD_DIR
+        - name: MAX_UPLOAD_SIZE
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: MAX_UPLOAD_SIZE
+        - name: ALLOWED_EXTENSIONS
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: ALLOWED_EXTENSIONS
+        - name: RATE_LIMIT_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: RATE_LIMIT_ENABLED
+        - name: RATE_LIMIT_PER_MINUTE
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: RATE_LIMIT_PER_MINUTE
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: LOG_LEVEL
+        - name: JSON_LOGGING
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: JSON_LOGGING
+        - name: AGENT_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: AGENT_TYPE
+        - name: POSTGRES_HOST
+          value: "postgres-service"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: POSTGRES_DB
+        - name: POSTGRES_POOL_SIZE
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: POSTGRES_POOL_SIZE
+        - name: PROJECT_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: PROJECT_NAME
+        - name: CHECKPOINT_TABLES
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: CHECKPOINT_TABLES
+        - name: GUNICORN_WORKERS
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: GUNICORN_WORKERS
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: PORT
+        volumeMounts:
+        - name: upload-storage
+          mountPath: /app/data
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: upload-storage
+        persistentVolumeClaim:
+          claimName: backend-upload-pvc
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backend-upload-pvc
+  namespace: langchain-langgraph-agent
+spec:
+  accessModes:
+    - ReadWriteMany  # 여러 Pod에서 공유 가능하도록
+  resources:
+    requests:
+      storage: 10Gi
+  # storageClassName: standard  # 클러스터의 StorageClass에 맞게 변경
+  storageClassName: hostpath  # 클러스터의 StorageClass에 맞게 변경
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: langchain-langgraph-agent
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: backend
+

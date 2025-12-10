@@ -85,6 +85,7 @@ class Settings(BaseSettings):
     
     # Logging
     LOG_LEVEL: str = "INFO"
+    JSON_LOGGING: str = "false"  # Set to "true" for structured JSON logs (recommended for production)
     
     # Agent Type
     AGENT_TYPE: str = "langgraph"  # Options: langchain, langgraph

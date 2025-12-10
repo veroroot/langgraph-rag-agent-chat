@@ -539,6 +539,8 @@ pyrightconfig.json
 ### Data ###
 data/
 
+### Kubernetes Secrets ###
+infra/k8s/secrets.yaml
 
 ### AI Guide ###
 guide/

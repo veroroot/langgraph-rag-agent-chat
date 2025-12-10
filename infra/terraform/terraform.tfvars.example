@@ -1,0 +1,31 @@
+# AWS Configuration
+aws_region = "ap-northeast-2"
+environment = "dev"
+
+# VPC Configuration
+vpc_cidr = "10.0.0.0/16"
+availability_zones = ["ap-northeast-2a", "ap-northeast-2c"]
+
+# RDS Configuration
+db_instance_class     = "db.t3.micro"
+db_allocated_storage  = 20
+db_username           = "postgres"
+# db_password should be set via environment variable or terraform.tfvars (not committed)
+# db_password = "your-secure-password-here"
+
+# ECS Configuration
+backend_cpu          = 512
+backend_memory       = 1024
+frontend_cpu         = 256
+frontend_memory      = 512
+backend_desired_count  = 2
+frontend_desired_count = 2
+
+# Application Configuration
+enable_s3_storage = true
+# domain_name = "your-domain.com"  # Optional
+
+# Secrets (should be set via environment variables or AWS Secrets Manager)
+# secret_key = "your-secret-key-here"
+# openai_api_key = "your-openai-api-key-here"
+

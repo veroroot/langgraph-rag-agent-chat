@@ -1,6 +1,20 @@
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+// 런타임 설정 우선, 없으면 빌드 타임 설정, 마지막으로 fallback
+const getApiBaseUrl = () => {
+  // 1. 런타임 설정 (window.__ENV__) - Kubernetes ConfigMap에서 주입
+  if (window.__ENV__?.VITE_API_BASE_URL !== undefined) {
+    return window.__ENV__.VITE_API_BASE_URL || ''
+  }
+  // 2. 빌드 타임 설정 (import.meta.env)
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL
+  }
+  // 3. Fallback (개발 환경)
+  return 'http://localhost:8000'
+}
+
+const API_BASE_URL = getApiBaseUrl()
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -91,7 +105,17 @@ export const chatAPI = {
     api.post('/api/v1/chat/', { message, session_id: sessionId, stream: false, provider, model }),
   sendMessageStream: async (message, sessionId, provider, model, onChunk, onDone, onError) => {
     const token = localStorage.getItem('token')
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+    // sendMessageStream에서도 동일한 로직 사용
+    const getStreamApiBaseUrl = () => {
+      if (window.__ENV__?.VITE_API_BASE_URL !== undefined) {
+        return window.__ENV__.VITE_API_BASE_URL || ''
+      }
+      if (import.meta.env.VITE_API_BASE_URL) {
+        return import.meta.env.VITE_API_BASE_URL
+      }
+      return 'http://localhost:8000'
+    }
+    const API_BASE_URL = getStreamApiBaseUrl()
     
     const response = await fetch(`${API_BASE_URL}/api/v1/chat/stream`, {
       method: 'POST',

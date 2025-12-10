@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-script
+  namespace: langchain-langgraph-agent
+data:
+  init_pgvector.sql: |
+    -- Enable pgvector extension
+    CREATE EXTENSION IF NOT EXISTS vector;
+    
+    -- Create database if not exists (handled by POSTGRES_DB env var)
+    -- Additional initialization scripts can be added here
+

@@ -25,4 +25,5 @@ dependencies = [
     "pgvector>=0.4.1",
     "langgraph-checkpoint-postgres>=3.0.1",
     "asgiref>=3.11.0",
+    "prometheus-fastapi-instrumentator>=7.0.0",
 ]
