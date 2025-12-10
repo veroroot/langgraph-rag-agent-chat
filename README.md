@@ -1,8 +1,8 @@
 # Langgraph RAG Agent Chat
 
-> Production-ready RAG (Retrieval-Augmented Generation) agent built with LangGraph and LangChain. Features document upload, vector search, and intelligent chat interface. FastAPI + React stack.
+> Production-ready RAG (Retrieval-Augmented Generation) agent built with LangGraph and LangChain. Features document upload, vector search, and intelligent chat interface. FastAPI + React stack, deployable to on-prem or cloud Kubernetes with Docker-first workflow.
 
-FastAPI + React 기반의 RAG(Retrieval-Augmented Generation) Agent 프로젝트입니다.
+FastAPI + React 기반의 RAG(Retrieval-Augmented Generation) Agent 프로젝트입니다. Kubernetes 기반으로 온프레미스/클라우드 어디서나 프로덕션 운영이 가능하며 Docker 중심의 워크플로우를 제공합니다.
 
 ## Table of Contents / 목차
 
@@ -25,7 +25,7 @@ FastAPI + React 기반의 RAG(Retrieval-Augmented Generation) Agent 프로젝트
 - 📚 **Document Management** - List, search, and delete uploaded documents
 - 💬 **RAG-based Chat Interface** - Intelligent conversations powered by LangGraph
 - 🔍 **Vector Search** - Semantic search using pgvector or Milvus
-- 🚀 **Production Ready** - Docker Compose setup with PostgreSQL and optional Milvus
+- 🚀 **Production Ready** - Docker Compose + Kubernetes manifests for on-prem/cloud
 - ⚡ **Real-time Streaming** - Streaming chat responses for better UX
 - 🔄 **Session Management** - Persistent chat sessions with conversation history
 
@@ -34,7 +34,7 @@ FastAPI + React 기반의 RAG(Retrieval-Augmented Generation) Agent 프로젝트
 - 📚 **문서 관리** - 문서 목록, 검색, 삭제
 - 💬 **RAG 기반 채팅** - LangGraph로 구동되는 지능형 대화
 - 🔍 **벡터 검색** - pgvector 또는 Milvus를 사용한 의미 기반 검색
-- 🚀 **프로덕션 준비** - PostgreSQL 및 선택적 Milvus를 포함한 Docker Compose 설정
+- 🚀 **프로덕션 준비** - 온프레미스/클라우드용 Kubernetes 매니페스트와 Compose
 - ⚡ **실시간 스트리밍** - 향상된 UX를 위한 스트리밍 채팅 응답
 - 🔄 **세션 관리** - 대화 기록이 있는 지속적인 채팅 세션
 
@@ -58,6 +58,30 @@ FastAPI + React 기반의 RAG(Retrieval-Augmented Generation) Agent 프로젝트
 
 ## Project Structure / 프로젝트 구조
 
+이 프로젝트는 **Monorepo 패턴**을 사용합니다. 모든 서비스(backend, frontend, infra)가 하나의 저장소에서 관리됩니다.
+
+This project uses a **Monorepo pattern**, where all services (backend, frontend, infra) are managed in a single repository.
+
+### Why Monorepo? / Monorepo를 사용하는 이유
+
+1. **통합 개발 환경 / Unified Development Environment**
+   - `docker-compose.yml`로 전체 스택을 한 번에 실행 가능
+   - All services can be run together with `docker-compose.yml`
+
+2. **의존성 관리 / Dependency Management**
+   - Python 의존성(`pyproject.toml`, `uv.lock`)은 루트에 위치하여 `uv` 패키지 매니저와 Docker 빌드 프로세스와 호환
+   - Python dependencies (`pyproject.toml`, `uv.lock`) are at the root for compatibility with `uv` package manager and Docker build process
+
+3. **공유 설정 / Shared Configuration**
+   - `.env`, `docker-compose.yml` 등 공통 설정 파일을 한 곳에서 관리
+   - Common configuration files like `.env` and `docker-compose.yml` are managed in one place
+
+4. **인프라 코드 통합 / Infrastructure Code Integration**
+   - Terraform, Kubernetes 설정이 프로젝트와 함께 버전 관리됨
+   - Terraform and Kubernetes configurations are version-controlled with the project
+
+### Directory Structure / 디렉토리 구조
+
 ```
 langgraph-rag-agent-chat/
 ├── backend/                # FastAPI backend / FastAPI 백엔드
@@ -75,10 +99,55 @@ langgraph-rag-agent-chat/
 │   │   ├── pages/        # Page components / 페이지 컴포넌트
 │   │   ├── components/   # Reusable components / 재사용 컴포넌트
 │   │   └── services/     # API services / API 서비스
-│   └── package.json
+│   └── package.json      # Frontend dependencies (Node.js) / 프론트엔드 의존성
+├── infra/                 # Infrastructure as Code / 인프라 코드
+│   ├── terraform/         # AWS infrastructure (ECS, RDS, etc.) / AWS 인프라
+│   ├── k8s/               # Kubernetes manifests / Kubernetes 매니페스트
+│   └── ci-cd/             # CI/CD pipelines (GitHub Actions) / CI/CD 파이프라인
+├── data/                  # Local data (PostgreSQL, uploads) / 로컬 데이터
+│   ├── postgres/          # PostgreSQL data directory / PostgreSQL 데이터 디렉토리
+│   └── uploads/           # Uploaded documents / 업로드된 문서
 ├── docker-compose.yml     # Docker Compose configuration / Docker Compose 설정
-└── pyproject.toml         # Python dependencies / Python 의존성
+├── pyproject.toml         # Python dependencies (backend) / Python 의존성 (백엔드)
+├── uv.lock                # Python dependency lock file / Python 의존성 락 파일
+└── .python-version        # Python version specification / Python 버전 명시
 ```
+
+### Important Notes for Developers / 개발자를 위한 중요 사항
+
+#### For Frontend Developers / 프론트엔드 개발자
+
+- **Python 파일 무시 가능 / Python files can be ignored**
+  - 루트의 `pyproject.toml`, `uv.lock`, `.python-version`은 백엔드 전용입니다
+  - `pyproject.toml`, `uv.lock`, `.python-version` at root are backend-only
+  - 프론트엔드 개발 시 `frontend/` 디렉토리만 작업하시면 됩니다
+  - For frontend development, you only need to work in the `frontend/` directory
+
+- **독립적인 의존성 관리 / Independent dependency management**
+  - 프론트엔드는 `frontend/package.json`으로 의존성을 관리합니다
+  - Frontend manages dependencies with `frontend/package.json`
+  - Python 의존성과는 완전히 분리되어 있습니다
+  - It's completely separate from Python dependencies
+
+#### For Infrastructure Engineers / 인프라 담당자
+
+- **루트의 Python 설정 파일 / Python config files at root**
+  - `pyproject.toml`, `uv.lock`이 루트에 있는 이유: Docker 빌드 시 `backend/Dockerfile`이 루트를 빌드 컨텍스트로 사용하기 때문입니다
+  - `pyproject.toml` and `uv.lock` are at root because `backend/Dockerfile` uses root as build context
+  - `uv` 패키지 매니저가 루트의 `pyproject.toml`을 기준으로 의존성을 설치합니다
+  - `uv` package manager installs dependencies based on `pyproject.toml` at root
+
+- **데이터 디렉토리 / Data directory**
+  - `data/` 디렉토리는 로컬 개발용 PostgreSQL 데이터와 업로드된 파일을 저장합니다
+  - `data/` directory stores PostgreSQL data and uploaded files for local development
+  - `.gitignore`에 포함되어 있어 Git에 커밋되지 않습니다
+  - It's in `.gitignore` and won't be committed to Git
+
+- **인프라 코드 위치 / Infrastructure code location**
+  - 모든 인프라 관련 코드는 `infra/` 디렉토리에 있습니다
+  - All infrastructure-related code is in the `infra/` directory
+  - Terraform, Kubernetes, CI/CD 설정이 각 하위 디렉토리에 분리되어 있습니다
+  - Terraform, Kubernetes, and CI/CD configurations are separated in subdirectories
 
 ## Getting Started / 시작하기
 
@@ -200,6 +269,39 @@ npm run dev
 - `POST /api/v1/chat/` - Send message (streaming) / 메시지 전송 (스트리밍)
 - `GET /api/v1/chat/sessions` - List chat sessions / 채팅 세션 목록
 - `GET /api/v1/chat/sessions/{id}/messages` - Get messages / 메시지 목록
+
+## Infrastructure Deployment / 인프라 배포
+
+이 프로젝트는 온프레미스와 클라우드 환경 모두에서 프로덕션 운영을 목표로 하며, 기본 배포 경로는 Kubernetes입니다. 로컬/스테이징에서는 Docker Compose로도 동일한 스택을 구동할 수 있습니다.
+
+### Kubernetes (On-premise & Cloud)
+
+- `infra/k8s/` 매니페스트를 사용해 온프레미스 클러스터 또는 클라우드 매니지드 Kubernetes(EKS/GKE/AKS 등)에 배포 가능합니다.
+- 인그레스, 로깅, 모니터링 예제가 포함되어 있어 바로 적용 후 확장할 수 있습니다.
+
+```bash
+kubectl apply -f infra/k8s/
+```
+
+자세한 내용은 [infra/k8s/README.md](./infra/k8s/README.md)를 참고하세요.
+
+### AWS Cloud (Terraform configs provided, full validation pending)
+
+- `infra/terraform/`에 AWS ECS Fargate용 Terraform 예제가 포함되어 있습니다.
+- 아직 개인 환경에서 엔드투엔드로 완전히 검증하진 않았으므로, 사용 전에 `terraform plan` 결과를 검토하고 필요한 변수/리소스 제약을 확인하세요.
+
+```bash
+cd infra/terraform
+terraform init
+terraform plan
+# terraform apply  # 계획을 충분히 검토한 뒤 적용
+```
+
+자세한 내용은 [infra/terraform/README.md](./infra/terraform/README.md)를 참고하세요.
+
+### CI/CD 자동 배포
+
+GitHub Actions를 사용한 자동 배포 설정은 [infra/ci-cd/README.md](./infra/ci-cd/README.md)를 참고하세요.
 
 ## Development Guide / 개발 가이드
 
